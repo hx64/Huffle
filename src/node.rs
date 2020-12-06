@@ -1,5 +1,6 @@
 use core::panic;
 
+#[derive(Debug, Clone)]
 pub struct Node {
     pub weight: i32,
     pub content: Option<char>,
