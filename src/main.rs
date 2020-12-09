@@ -1,16 +1,11 @@
-use auxiliary::{
-    gen_encoding_dict, gen_freq_dict, gen_huff_tree_from_dict, gen_node_arr, huff_decode_str,
-    huff_encode_str,
-};
-
-use encoding::all::ASCII;
-use encoding::{EncoderTrap, Encoding};
+use auxiliary::*;
 
 use clap::{App, Arg};
+use encoding::all::UTF_8;
+use encoding::{EncoderTrap, Encoding};
 
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::{BufReader, BufWriter};
 use std::path::Path;
 
 mod auxiliary;
@@ -54,76 +49,120 @@ fn main() {
                 .takes_value(true),
         )
         .get_matches();
+
     if matches.is_present("file") && matches.is_present("string") {
         panic!("不可同时输入字符串和文件！");
     }
+    if !matches.is_present("file") && !matches.is_present("string") {
+        panic!("未提供输入！");
+    }
+
     let decode = matches.is_present("decode");
-    if matches.is_present("output") {
-        let output_path = Path::new(matches.value_of("output").unwrap());
-        let output_display = output_path.display();
-        let mut output_file = match File::create(&output_path) {
-            Err(reason) => panic!("打开输出文件{}时出错：{}", output_display, reason),
-            Ok(file) => BufWriter::new(file),
+    let output = matches.is_present("output");
+
+    let mut target = String::new();
+    let mut result = String::new();
+
+    let mut huff_code = String::new();
+
+    if matches.is_present("string") {
+        target = matches.value_of("string").unwrap().to_string();
+        if decode {
+            let target_arr: Vec<char> = target.chars().collect();
+            let mut code_len = String::new();
+            let mut code_len_len = 0;
+            for each in target_arr {
+                code_len_len += 1;
+                if each == '/' {
+                    break;
+                }
+                code_len.push(each);
+            }
+            let code_len: u32 = code_len.parse().unwrap();
+            let huff_tree = gen_huff_tree_from_code(
+                &target[code_len_len as usize..(code_len_len + code_len) as usize],
+            );
+            let huff_dict = gen_encoding_dict(huff_tree);
+            result = huff_decode_str(&huff_dict, &target[(code_len_len + code_len) as usize..]);
+        }
+    } else {
+        let input_path = Path::new(matches.value_of("file").unwrap());
+        let input_display = input_path.display();
+        let mut input_file = match File::open(&input_path) {
+            Err(reason) => panic!("打开输入文件{}时出错：{}", input_display, reason),
+            Ok(file) => file,
         };
+        if decode {
+            let mut input_vec = Vec::new();
+            input_file
+                .read_to_end(&mut input_vec)
+                .expect("读取输入文件时出错");
+            let parse_result = parse_bytes(input_vec);
+            target = parse_result.1;
+            huff_code = parse_result.0;
+            let huff_tree = gen_huff_tree_from_code(&huff_code);
+            let huff_dict = gen_encoding_dict(huff_tree);
+            result = huff_decode_str(&huff_dict, &target);
+        } else {
+            input_file
+                .read_to_string(&mut target)
+                .expect("读取输入文件时出错");
+        }
     }
-    if matches.is_present("string") && !decode {
-        let target = matches.value_of("string").unwrap().to_string();
+    if !decode {
         let dict = gen_freq_dict(&target, None);
         let mut node_arr = gen_node_arr(dict);
         let huff_tree = gen_huff_tree_from_dict(&mut node_arr);
-        let huff_dict = gen_encoding_dict(huff_tree);
-        let encoded = huff_encode_str(&huff_dict, &target);
-        if matches.is_present("output") {}
-    }
-}
+        let huff_dict = gen_encoding_dict(huff_tree.clone());
+        let encoded_str = huff_encode_str(&huff_dict, &target);
+        huff_code = gen_huff_tree_code(huff_tree);
+        if !output {
+            result = huff_code.len().to_string();
+            result.push('/');
+            result.push_str(&huff_code);
+            result.push_str(&encoded_str);
+            println!("编码结果为：\n{}", &result);
+            println!("编码长度为：{}", result.len());
+            let comp_rate = (64 as f64
+                + 8 as f64 * UTF_8.encode(&huff_code, EncoderTrap::Strict).unwrap().len() as f64
+                + 8 as f64 * UTF_8.encode(&"/", EncoderTrap::Strict).unwrap().len() as f64
+                + encoded_str.len() as f64)
+                / (8 as f64 * UTF_8.encode(&target, EncoderTrap::Strict).unwrap().len() as f64);
+            println!("压缩率：{}", comp_rate);
+        } else {
+            result = encoded_str;
+        }
 
-#[cfg(test)]
-mod tests {
-    use crate::auxiliary::{
-        binary_string_to_bytes, bytes_to_binary_string, gen_encoding_dict, gen_freq_dict,
-        gen_huff_tree_code, gen_huff_tree_from_code, gen_huff_tree_from_dict, gen_node_arr,
-        huff_decode_str, huff_encode_str,
-    };
-
-    use encoding::all::ASCII;
-    use encoding::{EncoderTrap, Encoding};
-
-    #[test]
-    fn basic_comp() {
-        let target = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.".to_string();
-        let dict = gen_freq_dict(&target, None);
-        let mut node_arr = gen_node_arr(dict);
-        let huff_tree = gen_huff_tree_from_dict(&mut node_arr);
-        let huff_code = gen_huff_tree_code(huff_tree.clone());
-        let huff_code_bin: String = huff_code.bytes().map(|x| format!("{:b}", x)).collect();
-        let huff_dict = gen_encoding_dict(huff_tree);
-        let encoded = huff_encode_str(&huff_dict, &target);
-        println!("Huffle编码结果：\n{}", &encoded);
-        println!("总长度：{}", encoded.len());
-        println!("编码文件头：\n{}", huff_code_bin);
-        let decode_huff_tree = gen_huff_tree_from_code(&huff_code);
-        let decode_dict = gen_encoding_dict(decode_huff_tree);
-        let decoded = huff_decode_str(&decode_dict, &encoded);
-        println!("Huffle解码结果为：{}", decoded);
-        let ascii_encoded: String = ASCII
-            .encode(&target, EncoderTrap::Strict)
-            .unwrap()
-            .into_iter()
-            .map(|x| format!("{:b}", x))
-            .collect();
-        println!("Ascii编码结果：\n{}", ascii_encoded);
-        println!("总长度：{}", ascii_encoded.len());
-        let comp_rate = encoded.len() as f64 / ascii_encoded.len() as f64;
-        println!("压缩率：{}", comp_rate);
-    }
-
-    #[test]
-    fn string_to_bytes() {
-        let original = format!("{:b}", 1145141919);
-        println!("原二进制字符串为：{}", &original);
-        let parsed_bytes = binary_string_to_bytes(original);
-        println!("转换为bytes后为：{:?}", &parsed_bytes);
-        let parsed_string = bytes_to_binary_string(parsed_bytes);
-        println!("转换回二进制字符串为：{}", parsed_string);
+        if output {
+            let output_path = Path::new(matches.value_of("output").unwrap());
+            let output_display = output_path.display();
+            let mut output_file = match File::create(&output_path) {
+                Err(reason) => panic!("创建输出文件{}时出错：{}", output_display, reason),
+                Ok(file) => file,
+            };
+            match output_file.write_all(&gen_bytes(
+                &huff_code,
+                (8 - result.len() % 8) as u32,
+                &result,
+            )) {
+                Err(reason) => panic!("写入输出文件{}时出错：{}", output_display, reason),
+                Ok(_) => println!("写入完毕"),
+            };
+        }
+    } else {
+        if !output {
+            println!("解码结果为：{}", result);
+        } else {
+            let output_path = Path::new(matches.value_of("output").unwrap());
+            let output_display = output_path.display();
+            let mut output_file = match File::create(&output_path) {
+                Err(reason) => panic!("创建输出文件{}时出错：{}", output_display, reason),
+                Ok(file) => file,
+            };
+            match output_file.write(result.as_bytes()) {
+                Err(reason) => panic!("写入输出文件{}时出错：{}", output_display, reason),
+                Ok(_) => println!("写入完毕"),
+            };
+        }
     }
 }

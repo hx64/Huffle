@@ -1,5 +1,9 @@
 use crate::node;
+
 use std::collections::HashMap;
+
+use encoding::all::UTF_8;
+use encoding::{DecoderTrap, EncoderTrap, Encoding};
 
 pub fn gen_freq_dict(s: &str, original_dict: Option<HashMap<char, i32>>) -> HashMap<char, i32> {
     let mut dict: HashMap<char, i32> = original_dict.unwrap_or(HashMap::new());
@@ -52,7 +56,7 @@ fn traverse_node_tree_for_dict(curr: String, dict: &mut HashMap<char, String>, t
     }
 }
 
-pub fn huff_encode_str(dict: &HashMap<char, String>, source: &String) -> String {
+pub fn huff_encode_str(dict: &HashMap<char, String>, source: &str) -> String {
     let mut result = String::new();
     for each in source.chars() {
         result.push_str(dict.get(&each).unwrap())
@@ -60,7 +64,7 @@ pub fn huff_encode_str(dict: &HashMap<char, String>, source: &String) -> String 
     result
 }
 
-pub fn huff_decode_str(dict: &HashMap<char, String>, source: &String) -> String {
+pub fn huff_decode_str(dict: &HashMap<char, String>, source: &str) -> String {
     let mut result = String::new();
     let mut source_arr = source.chars().collect::<Vec<char>>();
     let mut rev_dict: HashMap<String, char> = HashMap::new();
@@ -118,7 +122,7 @@ pub fn gen_huff_tree_from_code(code: &str) -> node::Node {
     node_arr.remove(0)
 }
 
-pub fn binary_string_to_bytes(original: String) -> Vec<u8> {
+fn binary_string_to_bytes(original: &str) -> Vec<u8> {
     let mut char_arr: Vec<char> = original.chars().collect();
     let mut result: Vec<u8> = Vec::new();
     while !char_arr.is_empty() {
@@ -135,10 +139,38 @@ pub fn binary_string_to_bytes(original: String) -> Vec<u8> {
     result
 }
 
-pub fn bytes_to_binary_string(bytes: Vec<u8>) -> String {
+fn bytes_to_binary_string(bytes: &[u8], cutoff: u32) -> String {
     let mut result = String::new();
     for each in bytes {
         result.push_str(&format!("{:08b}", each));
     }
+    for _ in 0..cutoff as usize {
+        result.pop();
+    }
     result
+}
+
+pub fn gen_bytes(huff_code: &str, cutoff: u32, code: &str) -> Vec<u8> {
+    let mut result: Vec<u8> = Vec::new();
+    let huff_code_encoded = UTF_8.encode(huff_code, EncoderTrap::Strict).unwrap();
+    result.extend_from_slice(&(huff_code_encoded.len() as u32).to_be_bytes());
+    result.extend_from_slice(&cutoff.to_be_bytes());
+    result.extend_from_slice(&huff_code_encoded);
+    result.extend_from_slice(&binary_string_to_bytes(code));
+    result
+}
+
+pub fn parse_bytes(bytes: Vec<u8>) -> (String, String) {
+    let bytes_arr: &[u8] = &bytes;
+    let mut huff_code_len_arr: [u8; 4] = Default::default();
+    huff_code_len_arr.copy_from_slice(&bytes_arr[..4]);
+    let huff_code_len = u32::from_be_bytes(huff_code_len_arr);
+    let mut cutoff_arr: [u8; 4] = Default::default();
+    cutoff_arr.copy_from_slice(&bytes_arr[4..8]);
+    let cutoff = u32::from_be_bytes(cutoff_arr);
+    let huff_code = UTF_8
+        .decode(&bytes[8..(8 + huff_code_len as usize)], DecoderTrap::Strict)
+        .unwrap();
+    let encoded_str = bytes_to_binary_string(&bytes[(8 + huff_code_len as usize)..], cutoff);
+    (huff_code, encoded_str)
 }
