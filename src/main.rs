@@ -13,7 +13,7 @@ mod node;
 
 fn main() {
     let matches = App::new("Huffle")
-        .version("0.1.0")
+        .version("0.2.0")
         .author("Void04 <xiayuxuan@live.com>")
         .about("用Rust语言实现的霍夫曼编码实例。")
         .arg(
