@@ -1,10 +1,11 @@
 use crate::node;
 
-use std::collections::HashMap;
+use std::collections::HashMap;  // 导入哈希表模块便于构造字符频率字典
 
-use encoding::all::UTF_8;
+use encoding::all::UTF_8;   // 导入encoding模块便于编码文件头
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
 
+// 从字符串生成字符频率字典的函数
 pub fn gen_freq_dict(s: &str, original_dict: Option<HashMap<char, i32>>) -> HashMap<char, i32> {
     let mut dict: HashMap<char, i32> = original_dict.unwrap_or(HashMap::new());
     for ch in s.chars() {
@@ -14,6 +15,7 @@ pub fn gen_freq_dict(s: &str, original_dict: Option<HashMap<char, i32>>) -> Hash
     dict
 }
 
+// 从字符频率字典生成节点数组的函数
 pub fn gen_node_arr(dict: HashMap<char, i32>) -> Vec<node::Node> {
     let mut result = Vec::new();
     for (ch, weight) in dict.into_iter() {
@@ -22,6 +24,7 @@ pub fn gen_node_arr(dict: HashMap<char, i32>) -> Vec<node::Node> {
     result
 }
 
+// 从节点组生成霍夫曼树并返回根节点的函数
 pub fn gen_huff_tree_from_dict(arr: &mut Vec<node::Node>) -> node::Node {
     while arr.len() > 1 {
         let left_node = node::get_rarest(arr);
@@ -33,6 +36,7 @@ pub fn gen_huff_tree_from_dict(arr: &mut Vec<node::Node>) -> node::Node {
     arr.remove(0)
 }
 
+// 根据霍夫曼树（根节点）生成编码字典的函数
 pub fn gen_encoding_dict(tree_top: node::Node) -> HashMap<char, String> {
     let mut result = HashMap::new();
     let empty_encoding_str = String::new();
@@ -40,6 +44,7 @@ pub fn gen_encoding_dict(tree_top: node::Node) -> HashMap<char, String> {
     result
 }
 
+// 函数gen_encoding_dict中使用的递归遍历函数
 fn traverse_node_tree_for_dict(curr: String, dict: &mut HashMap<char, String>, target: node::Node) {
     let mut tmp_encoding_str_left = curr.clone();
     if let Some(child) = target.left {
@@ -56,6 +61,7 @@ fn traverse_node_tree_for_dict(curr: String, dict: &mut HashMap<char, String>, t
     }
 }
 
+// 通过编码字典编码字符串的函数
 pub fn huff_encode_str(dict: &HashMap<char, String>, source: &str) -> String {
     let mut result = String::new();
     for each in source.chars() {
@@ -64,6 +70,7 @@ pub fn huff_encode_str(dict: &HashMap<char, String>, source: &str) -> String {
     result
 }
 
+// 通过编码字典解码字符串的函数
 pub fn huff_decode_str(dict: &HashMap<char, String>, source: &str) -> String {
     let mut result = String::new();
     let mut source_arr = source.chars().collect::<Vec<char>>();
@@ -81,12 +88,14 @@ pub fn huff_decode_str(dict: &HashMap<char, String>, source: &str) -> String {
     result
 }
 
+// 从霍夫曼树根节点生成文件头字符串的函数
 pub fn gen_huff_tree_code(tree_top: node::Node) -> String {
     let mut result = String::new();
     traverse_node_tree_for_code(&mut result, tree_top);
     result
 }
 
+// 函数gen_huff_tree_code中使用的递归遍历函数
 fn traverse_node_tree_for_code(curr: &mut String, target: node::Node) {
     if target.content.is_some() {
         curr.push('0');
@@ -98,6 +107,7 @@ fn traverse_node_tree_for_code(curr: &mut String, target: node::Node) {
     }
 }
 
+// 从文件头字符串生成霍夫曼树的函数
 pub fn gen_huff_tree_from_code(code: &str) -> node::Node {
     let mut code_arr: Vec<char> = code.chars().collect();
     let mut node_arr = Vec::new();
@@ -122,6 +132,7 @@ pub fn gen_huff_tree_from_code(code: &str) -> node::Node {
     node_arr.remove(0)
 }
 
+// 二进制字符串转换为字节数组的函数
 fn binary_string_to_bytes(original: &str) -> Vec<u8> {
     let mut char_arr: Vec<char> = original.chars().collect();
     let mut result: Vec<u8> = Vec::new();
@@ -139,6 +150,7 @@ fn binary_string_to_bytes(original: &str) -> Vec<u8> {
     result
 }
 
+// 字节数组转换为二进制字符串的函数
 fn bytes_to_binary_string(bytes: &[u8], cutoff: u32) -> String {
     let mut result = String::new();
     for each in bytes {
@@ -150,6 +162,7 @@ fn bytes_to_binary_string(bytes: &[u8], cutoff: u32) -> String {
     result
 }
 
+// 生成写入文件的字符数组的函数
 pub fn gen_bytes(huff_code: &str, cutoff: u32, code: &str) -> Vec<u8> {
     let mut result: Vec<u8> = Vec::new();
     let huff_code_encoded = UTF_8.encode(huff_code, EncoderTrap::Strict).unwrap();
@@ -160,6 +173,7 @@ pub fn gen_bytes(huff_code: &str, cutoff: u32, code: &str) -> Vec<u8> {
     result
 }
 
+// 从文件中读取的字节数组提取文件头字符串和编码字符串的函数
 pub fn parse_bytes(bytes: Vec<u8>) -> (String, String) {
     let bytes_arr: &[u8] = &bytes;
     let mut huff_code_len_arr: [u8; 4] = Default::default();

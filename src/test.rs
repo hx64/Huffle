@@ -9,6 +9,7 @@ mod tests {
     use encoding::all::ASCII;
     use encoding::{EncoderTrap, Encoding};
 
+    // 基本编码字符串测试
     #[test]
     fn basic_comp() {
         let target = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.".to_string();
@@ -38,6 +39,7 @@ mod tests {
         println!("压缩率：{}", comp_rate);
     }
 
+    // 辅助函数测试
     #[test]
     fn string_to_bytes() {
         let original = format!("{:b}", 1145141919);

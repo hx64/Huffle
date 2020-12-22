@@ -1,14 +1,14 @@
-use auxiliary::*;
+use auxiliary::*;   // 导入auxiliary模块中所有函数
 
-use clap::{App, Arg};
-use encoding::all::UTF_8;
+use clap::{App, Arg};   // 导入clap模块便于读取命令行参数
+use encoding::all::UTF_8;   // 导入encoding模块用于计算压缩率
 use encoding::{EncoderTrap, Encoding};
 
-use std::fs::File;
+use std::fs::File;  // 导入文件相关模块用于读取和写入文件
 use std::io::prelude::*;
 use std::path::Path;
 
-mod auxiliary;
+mod auxiliary;  // 声明同crate下的模块
 mod node;
 
 fn main() {
@@ -48,14 +48,14 @@ fn main() {
                 .help("设置输出文件")
                 .takes_value(true),
         )
-        .get_matches();
+        .get_matches();     // 利用clap模块读取命令行参数
 
     if matches.is_present("file") && matches.is_present("string") {
         panic!("不可同时输入字符串和文件！");
     }
     if !matches.is_present("file") && !matches.is_present("string") {
         panic!("未提供输入！");
-    }
+    }   // 确保输入参数合理
 
     let decode = matches.is_present("decode");
     let output = matches.is_present("output");
@@ -66,8 +66,9 @@ fn main() {
     let mut huff_code = String::new();
 
     if matches.is_present("string") {
-        target = matches.value_of("string").unwrap().to_string();
+        target = matches.value_of("string").unwrap().to_string();   // 从命令行参数读取字符串
         if decode {
+            // 解码字符串
             let target_arr: Vec<char> = target.chars().collect();
             let mut code_len = String::new();
             let mut code_len_len = 0;
@@ -86,6 +87,7 @@ fn main() {
             result = huff_decode_str(&huff_dict, &target[(code_len_len + code_len) as usize..]);
         }
     } else {
+        // 从文件中读取输入
         let input_path = Path::new(matches.value_of("file").unwrap());
         let input_display = input_path.display();
         let mut input_file = match File::open(&input_path) {
@@ -93,6 +95,7 @@ fn main() {
             Ok(file) => file,
         };
         if decode {
+            // 解码读取出的输入
             let mut input_vec = Vec::new();
             input_file
                 .read_to_end(&mut input_vec)
@@ -104,12 +107,14 @@ fn main() {
             let huff_dict = gen_encoding_dict(huff_tree);
             result = huff_decode_str(&huff_dict, &target);
         } else {
+            // 将文件内容读入target变量
             input_file
                 .read_to_string(&mut target)
                 .expect("读取输入文件时出错");
         }
     }
     if !decode {
+        // 编码target变量中的内容到result变量
         let dict = gen_freq_dict(&target, None);
         let mut node_arr = gen_node_arr(dict);
         let huff_tree = gen_huff_tree_from_dict(&mut node_arr);
@@ -117,6 +122,7 @@ fn main() {
         let encoded_str = huff_encode_str(&huff_dict, &target);
         huff_code = gen_huff_tree_code(huff_tree);
         if !output {
+            // 在命令行输出编码结果和压缩率
             result = huff_code.len().to_string();
             result.push('/');
             result.push_str(&huff_code);
@@ -134,6 +140,7 @@ fn main() {
         }
 
         if output {
+            // 生成并写入编码结果
             let output_path = Path::new(matches.value_of("output").unwrap());
             let output_display = output_path.display();
             let mut output_file = match File::create(&output_path) {
@@ -151,8 +158,10 @@ fn main() {
         }
     } else {
         if !output {
+            // 在命令行输出解码结果
             println!("解码结果为：{}", result);
         } else {
+            // 写入解码结果
             let output_path = Path::new(matches.value_of("output").unwrap());
             let output_display = output_path.display();
             let mut output_file = match File::create(&output_path) {
